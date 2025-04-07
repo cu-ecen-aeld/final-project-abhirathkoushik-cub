@@ -19,4 +19,4 @@ Abhirath Koushik – *abhirath.koushik@colorado.edu* <br>
 Parth Varsani –    *parth.varsani@colorado.edu*  
 
 ## Schedule Page
-A shared schedule and milestones for the project can be found at the [Project Schedule](https://github.com/users/abhirathkoushik-cub/projects/2).
+A shared schedule and milestones for the project can be found at the [Project Schedule](https://github.com/users/abhirathkoushik-cub/projects/3).
