@@ -1,6 +1,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/i2c.h>
+#include <linux/i2c-smbus.h>
 #include <linux/init.h>
 
 #define APDS_ID_REG	0x92	// ID reg address
@@ -9,6 +10,7 @@
 
 static int apds_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
+    int ret, id_val;
     dev_info(&client->dev, "APDS Hello World Probe!\n");
 
     // Step 1: Send quick write to check ACK
