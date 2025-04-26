@@ -14,7 +14,7 @@ static int apds_probe(struct i2c_client *client, const struct i2c_device_id *id)
     dev_info(&client->dev, "APDS Hello World Probe!\n");
 
     // Step 1: Send quick write to check ACK
-    ret = i2c_smbus_write_quick(client, I2C_SMBUS_WRITE);
+    ret = i2c_smbus_write_byte_data(client, APDS_ID_REG, 0x00);
     if (ret < 0) {
         dev_err(&client->dev, "APDS device not responding at 0x%02x (NACK)\n", client->addr);
         return ret;
