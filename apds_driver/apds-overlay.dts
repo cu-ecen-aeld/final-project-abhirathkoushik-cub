@@ -11,7 +11,7 @@
             #size-cells = <0>;
 
             apds@39 {
-                compatible = "parth,apds";    // Must match your driver's .name
+                compatible = "apds-driver";    // Must match your driver's .name
                 reg = <0x39>;                 // I2C address of APDS sensor
             };
         };
