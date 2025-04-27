@@ -1,7 +1,7 @@
 #!/bin/bash
 
 FIFO_PATH="/tmp/proxpipe"
-THRESHOLD=50
+THRESHOLD=100
 SERVER_CAN_ID="100"
 CLIENT_CAN_ID="101"
 LED=17
