@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <linux/i2c-dev.h>
 #include <sys/ioctl.h>
-#include <i2c/smbus.h>
+#include <linux/i2c-smbus.h>
 
 #define APDS_I2C_ADDR 0x39
 #define APDS_ID_REG   0x92
