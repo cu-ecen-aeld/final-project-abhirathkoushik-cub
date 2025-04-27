@@ -4,6 +4,13 @@ FIFO_PATH="/tmp/proxpipe"
 THRESHOLD=100
 SERVER_CAN_ID="100"
 CLIENT_CAN_ID="101"
+LED=17
+
+# Configure LED GPIO
+echo "$LED" > /sys/class/gpio/export 2>/dev/null
+echo "out" > /sys/class/gpio/gpio$LED/direction
+echo "0" > /sys/class/gpio/gpio$LED/value
+
 
 # Setup CAN interface
 ip link set can0 up type can bitrate 125000
@@ -23,11 +30,12 @@ while true; do
     case "$STATE" in
         "CAN_RX")
             echo "[Client] State: CAN_RX - Waiting for Exit signal..."
+            echo "0" > /sys/class/gpio/gpio$LED/value
             candump can0 | while read -r iface canid bracket dlc data; do
                 if [ "$canid" = "$SERVER_CAN_ID" ]; then
                     val_dec=$((16#$dlc))
                     echo "[Client] Received Exit CAN frame. Value=$val_dec"
-                    # After receiving, switch to TX
+                    echo "1" > /sys/class/gpio/gpio$LED/value
                     STATE="CAN_TX"
                     break
                 fi
@@ -35,7 +43,7 @@ while true; do
             ;;
 
         "CAN_TX")
-            echo "[Client] State: CAN_TX - Reading proximity from FIFO..."
+            echo "[Client] State: CAN_TX - Reading proximity from FIFO and Transmitting back through CAN"
             prox_val=$(read_proximity)
             echo "[Client] Proximity: $prox_val"
 
