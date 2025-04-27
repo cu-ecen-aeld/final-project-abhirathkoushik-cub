@@ -1,13 +1,8 @@
-obj-m += apds_driver.o
-
-KDIR := $(KERNELDIR)
+TARGET = apds_read
 
 all:
-	make -C $(KDIR) M=$(PWD) modules
+	gcc -o $(TARGET) apds_read.c
 
 clean:
-	make -C $(KDIR) M=$(PWD) clean
-
-dtbo:
-	dtc -@ -I dts -O dtb -o apds-overlay.dtbo apds-overlay.dts
+	rm -f $(TARGET)
 
