@@ -2,18 +2,15 @@
 
 ip link set can0 up type can bitrate 125000
 
-i2cset -y 1 0x39 0x80 0x05
-sleep 1
+FIFO="/tmp/proxpipe"
 
-echo "Reading proximity sensor data ...."
 
-while true; do
-    val=$(i2cget -y 1 0x39 0x9c)
+while read -r val; do
+    val=$(echo "$val" | tr -d '[:spcae:]')
     val_hex=$(printf "%02X" "$val")
 
-    frame="000000$val_hex"
+    frame="$val_hex"
 
-    echo "sample $count: Proximity = $dec_val sending: $frame"
+    echo "$val, send: $frame"
     cansend can0 123#"$frame"
-    sleep 1
-done
+done < "$FIFO"
