@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 FIFO_PATH="/tmp/proxpipe"
 THRESHOLD=50
