@@ -72,7 +72,7 @@ int main() {
     system_state_t state = STATE_WAIT_FOR_SERVER;
 
     export_gpio(LED_GPIO);
-    set_gpio(LED_GPIO, 0);  // Ensure LED is initially OFF
+    set_gpio(LED_GPIO, 0);  
 
     // Setup CAN socket
     if ((can_socket = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
@@ -95,7 +95,7 @@ int main() {
         return 1;
     }
 
-	// Set CAN socket to non-blocking mode
+    // Set CAN socket to non-blocking mode
     int flags = fcntl(can_socket, F_GETFL, 0);
     fcntl(can_socket, F_SETFL, flags | O_NONBLOCK);
 
@@ -107,25 +107,23 @@ int main() {
             printf("[STATE] Entered WAIT_FOR_SERVER\n");
 
 	    // Drain all stale CAN frames
-                while (read(can_socket, &temp_frame, sizeof(temp_frame)) > 0) {
-                    // Discard
-                }
+	    while (read(can_socket, &temp_frame, sizeof(temp_frame)) > 0) {
+	    }
 
-// Read a fresh CAN frame
-                int nbytes = read(can_socket, &frame, sizeof(frame));
-                if (nbytes > 0 && frame.can_id == SERVER_CAN_ID) {
-                    printf("[CAN RX] Received: %d\n", frame.data[0]);
-                    if (frame.data[0] > THRESHOLD) {
-                        set_gpio(LED_GPIO, 1);
-                        printf("[LED] Turned ON (from server)\n");
-                        state = STATE_CHECK_LOCAL_SENSOR;
-                    }
-                }
-
-                sleep(1);  // throttle loop
+        // Read a fresh CAN frame
+	int nbytes = read(can_socket, &frame, sizeof(frame));
+	if (nbytes > 0 && frame.can_id == SERVER_CAN_ID) {
+	    printf("[CAN RX] Received: %d\n", frame.data[0]);
+	    if (frame.data[0] > THRESHOLD) {
+		set_gpio(LED_GPIO, 1);
+		printf("[LED] Turned ON (from server)\n");
+		state = STATE_CHECK_LOCAL_SENSOR;
+	    }
+	}
+                sleep(1);
                 break;
             }
-case STATE_CHECK_LOCAL_SENSOR: {
+	case STATE_CHECK_LOCAL_SENSOR: {
                 printf("Entered STATE_CHECK_LOCAL_SENSOR\n");
 
                 while (state == STATE_CHECK_LOCAL_SENSOR) {
@@ -149,14 +147,14 @@ case STATE_CHECK_LOCAL_SENSOR: {
                         perror("[ERROR] Could not open proximity value file");
                     }
 
-                    sleep(1);  // Check once per second
+                    sleep(1);  
                 }
 
                 break;
             }
 	}        
 
-        sleep(1);  // Avoid tight loop
+        sleep(1);
     }
 
     close(can_socket);
