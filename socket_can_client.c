@@ -23,18 +23,11 @@ typedef enum {
 } node_state_t;
 
 int main() {
-    int fifo_fd, can_socket;
+    int can_socket;
     struct sockaddr_can addr;
     struct ifreq ifr;
     struct can_frame frame;
     node_state_t state = STATE_RX;
-
-    // Open FIFO to read proximity values
-    fifo_fd = open(FIFO_PATH, O_RDONLY);
-    if (fifo_fd < 0) {
-        perror("Failed to open FIFO");
-        return 1;
-    }
 
     // Open CAN socket
     if ((can_socket = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
@@ -45,6 +38,7 @@ int main() {
     strcpy(ifr.ifr_name, "can0");
     if (ioctl(can_socket, SIOCGIFINDEX, &ifr) < 0) {
         perror("SIOCGIFINDEX");
+        close(can_socket);
         return 1;
     }
 
@@ -53,6 +47,7 @@ int main() {
 
     if (bind(can_socket, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("CAN bind error");
+        close(can_socket);
         return 1;
     }
 
@@ -65,31 +60,41 @@ int main() {
                 state = STATE_TX;
             }
         } else if (state == STATE_TX) {
-            char buf[16];
-            int proximity;
+            // Open FIFO only during TX state
+            int fifo_fd = open(FIFO_PATH, O_RDONLY);
+            if (fifo_fd < 0) {
+                perror("Failed to open FIFO during TX");
+            } else {
+                char buf[16];
+                int proximity;
 
-            lseek(fifo_fd, 0, SEEK_SET);
-            if (read(fifo_fd, buf, sizeof(buf)) > 0) {
-                proximity = atoi(buf);
-                printf("[TX] Proximity = %d\n", proximity);
+                if (read(fifo_fd, buf, sizeof(buf)) > 0) {
+                    proximity = atoi(buf);
+                    printf("[TX] Proximity = %d\n", proximity);
 
-                if (proximity > THRESHOLD) {
-                    frame.can_id = CLIENT_CAN_ID;
-                    frame.can_dlc = 1;
-                    frame.data[0] = (uint8_t)proximity;
+                    if (proximity > THRESHOLD) {
+                        frame.can_id = CLIENT_CAN_ID;
+                        frame.can_dlc = 1;
+                        frame.data[0] = (uint8_t)proximity;
 
-                    if (write(can_socket, &frame, sizeof(frame)) != -1) {
-                        printf("[TX] Sent CAN frame to server: %d\n", proximity);
-                        state = STATE_RX;
-                    }
+                        if (write(can_socket, &frame, sizeof(frame)) != -1) {
+                            printf("[TX] Sent CAN frame to server: %d\n", proximity);
+                        } else {
+                            perror("CAN TX failed");
+                        }
+                    } 
+                      
                 }
+
+                close(fifo_fd);
             }
+
+            state = STATE_RX; // return to receive state
         }
 
-        sleep(1); // Control polling frequency
+        sleep(1); // Avoid busy loop
     }
 
-    close(fifo_fd);
     close(can_socket);
     return 0;
 }
