@@ -68,7 +68,7 @@ int main() {
     int can_socket;
     struct sockaddr_can addr;
     struct ifreq ifr;
-    struct can_frame frame;
+    struct can_frame frame, temp_frame;
     system_state_t state = STATE_WAIT_FOR_SERVER;
 
     export_gpio(LED_GPIO);
@@ -95,6 +95,10 @@ int main() {
         return 1;
     }
 
+	// Set CAN socket to non-blocking mode
+    int flags = fcntl(can_socket, F_GETFL, 0);
+    fcntl(can_socket, F_SETFL, flags | O_NONBLOCK);
+
     printf("[STATE] Starting in WAIT_FOR_SERVER state...\n");
 
     while (1) {
@@ -102,34 +106,25 @@ int main() {
         case STATE_WAIT_FOR_SERVER: {
             printf("[STATE] Entered WAIT_FOR_SERVER\n");
 
-            struct can_frame frame1, frame2;
-            int nbytes1 = read(can_socket, &frame1, sizeof(frame1));
-            if (nbytes1 > 0 && frame1.can_id == SERVER_CAN_ID) {
-                printf("[CAN RX] Frame 1: %d\n", frame1.data[0]);
-            } else {
-                printf("[CAN RX] Failed to receive frame 1\n");
+	    // Drain all stale CAN frames
+                while (read(can_socket, &temp_frame, sizeof(temp_frame)) > 0) {
+                    // Discard
+                }
+
+// Read a fresh CAN frame
+                int nbytes = read(can_socket, &frame, sizeof(frame));
+                if (nbytes > 0 && frame.can_id == SERVER_CAN_ID) {
+                    printf("[CAN RX] Received: %d\n", frame.data[0]);
+                    if (frame.data[0] > THRESHOLD) {
+                        set_gpio(LED_GPIO, 1);
+                        printf("[LED] Turned ON (from server)\n");
+                        state = STATE_CHECK_LOCAL_SENSOR;
+                    }
+                }
+
+                sleep(1);  // throttle loop
                 break;
             }
-
-            sleep(2);  // wait before reading second frame
-
-            int nbytes2 = read(can_socket, &frame2, sizeof(frame2));
-            if (nbytes2 > 0 && frame2.can_id == SERVER_CAN_ID) {
-                printf("[CAN RX] Frame 2: %d\n", frame2.data[0]);
-
-                if (frame1.data[0] > THRESHOLD && frame2.data[0] > THRESHOLD) {
-                    set_gpio(LED_GPIO, 1);
-                    printf("[LED] Turned ON (from server)\n");
-                    state = STATE_CHECK_LOCAL_SENSOR;
-                } else {
-                    printf("[INFO] One or both frame values below threshold\n");
-                }
-            } else {
-                printf("[CAN RX] Failed to receive frame 2\n");
-            }
-
-            break;
-        }
 
         case STATE_CHECK_LOCAL_SENSOR: {
             printf("[STATE] Entered CHECK_LOCAL_SENSOR\n");
@@ -155,7 +150,7 @@ int main() {
             printf("[STATE] Returning to WAIT_FOR_SERVER\n");
             break;
         }
-        }
+	}        
 
         sleep(1);  // Avoid tight loop
     }
