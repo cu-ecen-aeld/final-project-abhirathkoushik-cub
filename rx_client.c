@@ -96,6 +96,7 @@ int main() {
     while (1) {
         switch (state) {
             case STATE_WAIT_FOR_SERVER: {
+						printf("Entered in STATE_WAIT_FOR_SERVER");
                 int nbytes = read(can_socket, &frame, sizeof(frame));
                 if (nbytes > 0 && frame.can_id == SERVER_CAN_ID) {
                     printf("[CAN RX] Received: %d\n", frame.data[0]);
@@ -103,25 +104,30 @@ int main() {
                         set_gpio(LED_GPIO, 1);
                         printf("[LED] Turned ON (from server)\n");
                         state = STATE_CHECK_LOCAL_SENSOR;
-                        fifo_fd = open_fifo_reader();
-                        fp = fdopen(fifo_fd, "r");
-                        if (!fp) {
-                            perror("[ERROR] fdopen failed");
-                            close(fifo_fd);
-                            fifo_fd = -1;
-                            state = STATE_WAIT_FOR_SERVER;
-                        }
+      //                  fifo_fd = open_fifo_reader();
+//                        fp = fdopen(fifo_fd, "r");
+//                        if (!fp) {
+//                            perror("[ERROR] fdopen failed");
+//                            close(fifo_fd);
+  //                          fifo_fd = -1;
+    //                        state = STATE_WAIT_FOR_SERVER;
+        //                }
                     }
                 }
                 break;
             }
 
             case STATE_CHECK_LOCAL_SENSOR: {
+						   	
+		printf("Entered in STATE_CHECK_LOCAL_SENSOR");				   
                 if (!fp) {
                     fifo_fd = open_fifo_reader();
                     fp = fdopen(fifo_fd, "r");
                     if (!fp) {
+
                         perror("[ERROR] fdopen failed inside CHECK_LOCAL_SENSOR");
+			close(fifo_fd);
+			fifo_fd = -1;
                         break;
                     }
                 }
@@ -132,9 +138,9 @@ int main() {
                     if (proximity > THRESHOLD) {
                         set_gpio(LED_GPIO, 0);
                         printf("[LED] Turned OFF (from local sensor)\n");
-                        fclose(fp);
-                        fp = NULL;
-                        fifo_fd = -1;
+                        //fclose(fp);
+                        //fp = NULL;
+                        //fifo_fd = -1;
                         state = STATE_WAIT_FOR_SERVER;
                         printf("[STATE] Back to WAIT_FOR_SERVER\n");
                     }
