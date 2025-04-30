@@ -125,31 +125,35 @@ int main() {
                 sleep(1);  // throttle loop
                 break;
             }
+case STATE_CHECK_LOCAL_SENSOR: {
+                printf("Entered STATE_CHECK_LOCAL_SENSOR\n");
 
-        case STATE_CHECK_LOCAL_SENSOR: {
-            printf("[STATE] Entered CHECK_LOCAL_SENSOR\n");
+                while (state == STATE_CHECK_LOCAL_SENSOR) {
+                    FILE *fp = fopen(FILE_PATH, "r");
+                    if (fp) {
+                        char buf[16];
+                        if (fgets(buf, sizeof(buf), fp)) {
+                            int proximity = atoi(buf);
+                            printf("[Sensor] Proximity: %d\n", proximity);
+                            if (proximity > THRESHOLD) {
+                                set_gpio(LED_GPIO, 0);
+                                printf("[LED] Turned OFF (from local sensor)\n");
+                                state = STATE_WAIT_FOR_SERVER;
+                                printf("[STATE] Back to WAIT_FOR_SERVER\n");
+                            }
+                        } else {
+                            perror("[ERROR] Could not read proximity value from file");
+                        }
+                        fclose(fp);
+                    } else {
+                        perror("[ERROR] Could not open proximity value file");
+                    }
 
-            int first = read_proximity_value();
-            if (first == -1) break;
-            printf("[Sensor] First proximity = %d\n", first);
+                    sleep(1);  // Check once per second
+                }
 
-            sleep(2);
-
-            int second = read_proximity_value();
-            if (second == -1) break;
-            printf("[Sensor] Second proximity = %d\n", second);
-
-            if (first > THRESHOLD && second > THRESHOLD) {
-                set_gpio(LED_GPIO, 0);
-                printf("[LED] Turned OFF (from local sensor double check)\n");
-            } else {
-                printf("[INFO] Conditions not met to turn off LED\n");
+                break;
             }
-
-            state = STATE_WAIT_FOR_SERVER;
-            printf("[STATE] Returning to WAIT_FOR_SERVER\n");
-            break;
-        }
 	}        
 
         sleep(1);  // Avoid tight loop
