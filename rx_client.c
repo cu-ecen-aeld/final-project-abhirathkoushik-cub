@@ -1,4 +1,3 @@
-// client_can_control.c
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,21 +41,41 @@ void set_gpio(int gpio, int value) {
     }
 }
 
+void toggle_gpio(int gpio) {
+    char path[64], val;
+    snprintf(path, sizeof(path), "/sys/class/gpio/gpio%d/value", gpio);
+    int fd = open(path, O_RDWR);
+    if (fd >= 0) {
+        read(fd, &val, 1);
+        lseek(fd, 0, SEEK_SET);
+        if (val == '1') write(fd, "0", 1);
+        else            write(fd, "1", 1);
+        close(fd);
+    }
+}
+
+int open_fifo_reader() {
+    int fd;
+    while ((fd = open(FIFO_PATH, O_RDONLY | O_NONBLOCK)) < 0) {
+        perror("Waiting for writer to open FIFO");
+        sleep(1);
+    }
+    printf("[INFO] FIFO opened for reading\n");
+    return fd;
+}
+
 int main() {
-    int can_socket, fifo_fd;
+    int can_socket;
     struct sockaddr_can addr;
     struct ifreq ifr;
     struct can_frame frame;
+    char buf[16];
+    int fifo_fd;
 
     export_gpio(LED_GPIO);
     set_gpio(LED_GPIO, 0); // initially OFF
 
-    fifo_fd = open(FIFO_PATH, O_RDONLY);
-    if (fifo_fd < 0) {
-        perror("FIFO open failed");
-        return 1;
-    }
-
+    // Open CAN socket
     if ((can_socket = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
         perror("CAN socket failed");
         return 1;
@@ -65,6 +84,7 @@ int main() {
     strcpy(ifr.ifr_name, "can0");
     if (ioctl(can_socket, SIOCGIFINDEX, &ifr) < 0) {
         perror("SIOCGIFINDEX failed");
+        close(can_socket);
         return 1;
     }
 
@@ -72,31 +92,44 @@ int main() {
     addr.can_ifindex = ifr.ifr_ifindex;
     if (bind(can_socket, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("CAN bind failed");
+        close(can_socket);
         return 1;
     }
 
+    fifo_fd = open_fifo_reader();
+
     while (1) {
-        // 1. Check for CAN from server
+        // --- CAN RX block ---
         int nbytes = read(can_socket, &frame, sizeof(frame));
         if (nbytes > 0 && frame.can_id == SERVER_CAN_ID) {
-            printf("[Client] Received CAN: %d\n", frame.data[0]);
+            printf("[CAN RX] Received from server: %d\n", frame.data[0]);
             if (frame.data[0] > THRESHOLD) {
-                set_gpio(LED_GPIO, 1); // Turn ON LED
-                printf("[Client] LED ON from server\n");
+                set_gpio(LED_GPIO, 1);
+                printf("[LED] Turned ON (command from server)\n");
             }
         }
 
-        // 2. Check local proximity to turn OFF LED
-        char buf[16];
-        int proximity;
-        if (read(fifo_fd, buf, sizeof(buf)) > 0) {
-            proximity = atoi(buf);
+        // --- Local proximity sensor block ---
+        memset(buf, 0, sizeof(buf));
+        ssize_t r = read(fifo_fd, buf, sizeof(buf) - 1);
+        if (r > 0) {
+            int proximity = atoi(buf);
+            printf("[Sensor] Proximity = %d\n", proximity);
+
             if (proximity > THRESHOLD) {
                 set_gpio(LED_GPIO, 0);
-                printf("[Client] LED OFF by local sensor: %d\n", proximity);
+                printf("[LED] Turned OFF (local proximity triggered)\n");
             }
+        } else if (r == 0) {
+            // FIFO writer closed, reopen it
+            close(fifo_fd);
+            printf("[INFO] FIFO writer closed, reopening...\n");
+            fifo_fd = open_fifo_reader();
+        } else if (r < 0 && errno != EAGAIN) {
+            perror("FIFO read failed");
         }
-        sleep(1);
+
+        sleep(1); // Prevent CPU overuse
     }
 
     close(fifo_fd);
