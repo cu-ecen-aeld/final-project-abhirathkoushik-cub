@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <errno.h>
+#include <stdint.h>
 
 #define FIFO_PATH "/tmp/proxpipe"
 #define SERVER_CAN_ID 0x100

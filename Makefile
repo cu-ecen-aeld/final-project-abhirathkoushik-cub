@@ -1,7 +1,7 @@
 TARGET1 = can_tx_from_file
 TARGET2 = apds_can_control
 TARGET3 = socket_can_client
-TARGET4 = soclet_can_server
+TARGET4 = socket_can_server
 
 all: $(TARGET1) $(TARGET2) $(TARGET3) $(TARGET4)
 
