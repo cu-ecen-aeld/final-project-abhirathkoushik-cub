@@ -1,8 +1,14 @@
-TARGET = apds_read
+TARGET1 = apds_read
+TARGET2 = apds_read_file
 
-all:
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TARGET) apds_read.c
+all: $(TARGET1) $(TARGET2)
+
+$(TARGET1): $(TARGET1).c
+        $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+
+$(TARGET2): $(TARGET2).c
+        $(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET1) $(TARGET2)
 
