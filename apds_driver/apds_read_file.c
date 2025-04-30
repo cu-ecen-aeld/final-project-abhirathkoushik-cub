@@ -135,7 +135,7 @@ int main()
         }
 
         // ✅ Write to text file instead of FIFO
-        FILE *fp = fopen(TXT_PATH, "w");
+        FILE *fp = fopen(FILE_PATH, "w");
         if (fp)
         {
             fprintf(fp, "%d\n", proximity);
