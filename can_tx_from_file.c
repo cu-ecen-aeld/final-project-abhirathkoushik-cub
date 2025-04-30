@@ -9,7 +9,7 @@
 #include <linux/can.h>
 #include <linux/can/raw.h>
 
-#define APDS_FILE "/tmp/apds"
+#define APDS_FILE "/tmp/proxpipe"
 #define THRESHOLD 100
 #define CAN_INTERFACE "can0"
 #define CAN_ID 0x100
