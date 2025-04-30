@@ -12,7 +12,7 @@
 #include <errno.h>
 #include <stdint.h>
 
-#define FIFO_PATH "/tmp/proxpipe"
+#define PROX_FILE "/tmp/proxval.txt"
 #define SERVER_CAN_ID 0x100
 #define CLIENT_CAN_ID 0x101
 #define THRESHOLD 100
@@ -51,6 +51,8 @@ int main() {
         return 1;
     }
 
+    printf("Client started. Waiting in RX state...\n");
+
     while (1) {
         if (state == STATE_RX) {
             struct can_frame rx_frame;
@@ -59,43 +61,50 @@ int main() {
                 printf("[RX] Received from server: %d\n", rx_frame.data[0]);
                 state = STATE_TX;
             }
-        } else if (state == STATE_TX) {
-            // Open FIFO only during TX state
-            int fifo_fd = open(FIFO_PATH, O_RDONLY);
-            if (fifo_fd < 0) {
-                perror("Failed to open FIFO during TX");
-            } else {
-                char buf[16];
-                int proximity;
+        }
+        else if (state == STATE_TX) {
+            int proximity = 0;
 
-                if (read(fifo_fd, buf, sizeof(buf)) > 0) {
-                    proximity = atoi(buf);
-                    printf("[TX] Proximity = %d\n", proximity);
-
-                    if (proximity > THRESHOLD) {
-                        frame.can_id = CLIENT_CAN_ID;
-                        frame.can_dlc = 1;
-                        frame.data[0] = (uint8_t)proximity;
-
-                        if (write(can_socket, &frame, sizeof(frame)) != -1) {
-                            printf("[TX] Sent CAN frame to server: %d\n", proximity);
-                        } else {
-                            perror("CAN TX failed");
-                        }
-                    } 
-                      
+            while (1) {
+                FILE *fp = fopen(PROX_FILE, "r");
+                if (!fp) {
+                    perror("[TX] Failed to open proximity file");
+                    sleep(1);
+                    continue;
                 }
 
-                close(fifo_fd);
-            }
+                if (fscanf(fp, "%d", &proximity) == 1) {
+                    printf("[TX] Read Proximity = %d\n", proximity);
+                } else {
+                    printf("[TX] Failed to parse proximity from file\n");
+                }
 
-            state = STATE_RX; // return to receive state
+                fclose(fp);
+
+                if (proximity > THRESHOLD) {
+                    frame.can_id = CLIENT_CAN_ID;
+                    frame.can_dlc = 1;
+                    frame.data[0] = (uint8_t)proximity;
+
+                    if (write(can_socket, &frame, sizeof(frame)) != -1) {
+                        printf("[TX] Sent CAN frame: %d\n", proximity);
+                    } else {
+                        perror("CAN write failed");
+                    }
+
+                    state = STATE_RX;
+                    break;
+                } else {
+                    printf("[TX] Proximity below threshold (%d), waiting...\n", THRESHOLD);
+                }
+
+                sleep(1); // Wait before checking again
+            }
         }
 
-        sleep(1); // Avoid busy loop
+        sleep(1); // Control polling frequency (can be adjusted)
     }
 
     close(can_socket);
     return 0;
 }
-
