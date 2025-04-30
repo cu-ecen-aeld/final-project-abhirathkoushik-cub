@@ -91,7 +91,7 @@ int read_proximity_data(int fd)
 
 int main()
 {
-    openlog("APDS_LOG", LOG_PID | LOG_PERROR, LOG_USER);
+    openlog("APDS_LOG", LOG_PID, LOG_USER);
 
     int fd = open(I2C_DEVICE, O_RDWR);
     if (fd < 0)

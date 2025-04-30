@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <stdint.h>
 
-#define FIFO_PATH "/tmp/proxpipe"
+#define FILE_PATH "/tmp/proxval.txt"
 #define SERVER_CAN_ID 0x100
 #define THRESHOLD 100
 #define LED_GPIO 17
@@ -44,16 +44,6 @@ void set_gpio(int gpio, int value) {
         dprintf(fd, "%d", value);
         close(fd);
     }
-}
-
-int open_fifo_reader() {
-    int fd;
-    while ((fd = open(FIFO_PATH, O_RDONLY)) < 0) {
-        perror("[WAIT] Waiting for FIFO writer...");
-        sleep(1);
-    }
-    printf("[INFO] FIFO opened for reading\n");
-    return fd;
 }
 
 int main() {
@@ -89,14 +79,10 @@ int main() {
 
     printf("[STATE] Starting in WAIT_FOR_SERVER state...\n");
 
-    int fifo_fd = -1;
-    FILE *fp = NULL;
-    char buf[16];
-
     while (1) {
         switch (state) {
             case STATE_WAIT_FOR_SERVER: {
-						printf("Entered in STATE_WAIT_FOR_SERVER");
+                printf("Entered STATE_WAIT_FOR_SERVER\n");
                 int nbytes = read(can_socket, &frame, sizeof(frame));
                 if (nbytes > 0 && frame.can_id == SERVER_CAN_ID) {
                     printf("[CAN RX] Received: %d\n", frame.data[0]);
@@ -104,64 +90,45 @@ int main() {
                         set_gpio(LED_GPIO, 1);
                         printf("[LED] Turned ON (from server)\n");
                         state = STATE_CHECK_LOCAL_SENSOR;
-      //                  fifo_fd = open_fifo_reader();
-//                        fp = fdopen(fifo_fd, "r");
-//                        if (!fp) {
-//                            perror("[ERROR] fdopen failed");
-//                            close(fifo_fd);
-  //                          fifo_fd = -1;
-    //                        state = STATE_WAIT_FOR_SERVER;
-        //                }
                     }
                 }
                 break;
             }
 
             case STATE_CHECK_LOCAL_SENSOR: {
-						   	
-		printf("Entered in STATE_CHECK_LOCAL_SENSOR");				   
-                if (!fp) {
-                    fifo_fd = open_fifo_reader();
-                    fp = fdopen(fifo_fd, "r");
-                    if (!fp) {
+                printf("Entered STATE_CHECK_LOCAL_SENSOR\n");
 
-                        perror("[ERROR] fdopen failed inside CHECK_LOCAL_SENSOR");
-			close(fifo_fd);
-			fifo_fd = -1;
-                        break;
+                while (state == STATE_CHECK_LOCAL_SENSOR) {
+                    FILE *fp = fopen(FILE_PATH, "r");
+                    if (fp) {
+                        char buf[16];
+                        if (fgets(buf, sizeof(buf), fp)) {
+                            int proximity = atoi(buf);
+                            printf("[Sensor] Proximity: %d\n", proximity);
+                            if (proximity > THRESHOLD) {
+                                set_gpio(LED_GPIO, 0);
+                                printf("[LED] Turned OFF (from local sensor)\n");
+                                state = STATE_WAIT_FOR_SERVER;
+                                printf("[STATE] Back to WAIT_FOR_SERVER\n");
+                            }
+                        } else {
+                            perror("[ERROR] Could not read proximity value from file");
+                        }
+                        fclose(fp);
+                    } else {
+                        perror("[ERROR] Could not open proximity value file");
                     }
+
+                    sleep(1);  // Check once per second
                 }
 
-                if (fgets(buf, sizeof(buf), fp)) {
-                    int proximity = atoi(buf);
-                    printf("[Sensor] Proximity: %d\n", proximity);
-                    if (proximity > THRESHOLD) {
-                        set_gpio(LED_GPIO, 0);
-                        printf("[LED] Turned OFF (from local sensor)\n");
-                        //fclose(fp);
-                        //fp = NULL;
-                        //fifo_fd = -1;
-                        state = STATE_WAIT_FOR_SERVER;
-                        printf("[STATE] Back to WAIT_FOR_SERVER\n");
-                    }
-                } else if (feof(fp)) {
-                    printf("[INFO] EOF from FIFO, reopening...\n");
-                    fclose(fp);
-                    fp = NULL;
-                    fifo_fd = -1;
-                } else if (ferror(fp)) {
-                    perror("[ERROR] Error reading from FIFO");
-                    clearerr(fp);
-                }
                 break;
             }
         }
 
-        sleep(1);
+        sleep(1);  // State loop delay
     }
 
-    if (fp) fclose(fp);
-    if (fifo_fd >= 0) close(fifo_fd);
     close(can_socket);
     return 0;
 }
