@@ -17,7 +17,6 @@
 #define ENABLE_REG 0x80
 #define PROXIMITY_REG 0x9C
 #define FILE_PATH "/tmp/proxval.txt"
-#define PINET_IOCTL_SEND_SENSOR_DATA _IOW('p', 1, int)
 
 // Check if the sensor is connected
 int check_sensor_connected(int fd)
@@ -54,7 +53,7 @@ int enable_proximity(int fd)
 {
     uint8_t buf[2];
     buf[0] = ENABLE_REG;
-    buf[1] = 0x05; // PON (power ON) + PEN (proximity enable)
+    buf[1] = 0x05; 
 
     if (write(fd, buf, 2) != 2)
     {
@@ -119,12 +118,6 @@ int main()
         return EXIT_FAILURE;
     }
 
-    int pinet_file = open("/dev/pinet", O_RDWR);
-    if (pinet_file < 0)
-    {
-        syslog(LOG_ERR, "open /dev/pinet failed: %s", strerror(errno));
-    }
-
     while (1)
     {
         int proximity = read_proximity_data(fd);
@@ -134,7 +127,7 @@ int main()
             break;
         }
 
-        // ✅ Write to text file instead of FIFO
+        // Write to text file 
         FILE *fp = fopen(FILE_PATH, "w");
         if (fp)
         {
@@ -146,21 +139,10 @@ int main()
             syslog(LOG_ERR, "Failed to write to proximity text file: %s", strerror(errno));
         }
 
-        // Optional: send to /dev/pinet
-        if (pinet_file >= 0)
-        {
-            if (ioctl(pinet_file, PINET_IOCTL_SEND_SENSOR_DATA, &proximity) == -1)
-            {
-                syslog(LOG_ERR, "ioctl to /dev/pinet failed");
-            }
-        }
-
         sleep(1);
     }
 
     close(fd);
-    if (pinet_file >= 0)
-        close(pinet_file);
     closelog();
     return EXIT_SUCCESS;
 }
